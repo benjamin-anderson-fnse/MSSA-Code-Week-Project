@@ -1,0 +1,59 @@
+# This Code provides a tool for organizing and cleaning up log files by creating new file locations and instilling a naming convention utilizing timestamp labeling. This also searches for files older than 30 days and moves them into a compressed archive file.
+1) Create folders for organizing projects
+2) Rename files in a folder based on a naming convention
+3) Search for specific text within files in a directory
+4) Backup files from a source directory to a target directory with versioning
+5) Compress files older than a specified date into a zip archive and move them to an archive directory
+
+
+$folders = @("Docs", "Scripts", "Backups", "Archives", "Logs")
+    foreach ($folder in $folders) {
+        $path = Join-Path -Path "C:\Projects" -ChildPath $folder
+        if (-not (Test-Path -Path $path)) {
+            New-Item -ItemType Directory -Path $path
+            Write-Host "Created folder: $path"
+        } else {
+            Write-Host "Folder already exists: $path"
+        }
+    }
+
+$files = Get-ChildItem -Path ("C:\Projects\Archives", "C:\Projects\Docs", "C:\Projects\Scripts", "C:\Projects\Backups", "C:\Projects\Logs") -File
+    foreach ($file in $files) {
+        $newName = "$($file.BaseName)_$(Get-Date -Format 'yyyyMMdd_HHmmss')$($file.Extension)"
+        $newPath = Join-Path -Path ("C:\Projects\Archives", "C:\Projects\Docs", "C:\Projects\Scripts", "C:\Projects\Backups", "C:\Projects\Logs") -ChildPath $newName
+        Rename-Item -Path $file.FullName -NewName $newName
+        Write-Host "Renamed file: $($file.Name) to $newName"
+    }
+
+$files = Get-ChildItem -Path ("C:\Projects\Archives", "C:\Projects\Docs", "C:\Projects\Scripts", "C:\Projects\Backups", "C:\Projects\Logs") -File
+    foreach ($file in $files) {
+        $content = Get-Content -Path $file.FullName
+        if ($content -like "*specific text*") {
+            Write-Host "Found specific text in file: $($file.Name)"
+        }
+    }
+
+$sourceDir = ("C:\Projects\Docs", "C:\Projects\Scripts")
+$targetDir = "C:\Projects\Backups"
+$files = Get-ChildItem -Path $sourceDir -File
+    foreach ($file in $files) {
+        $timestamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        $backupName = "$($file.BaseName)_$timestamp$($file.Extension)"
+        $backupPath = Join-Path -Path $targetDir -ChildPath $backupName
+        Copy-Item -Path $file.FullName -Destination $backupPath
+        Write-Host "Backed up file: $($file.Name) to $backupName"
+    }
+
+$archiveDir = "C:\Projects\Archives"
+$cutoffDate = (Get-Date).AddDays(-$retentionDays) 
+$retentionDays = 30
+$filesToArchive = Get-ChildItem -Path ("C:\Projects\Docs", "C:\Projects\Scripts", "C:\Projects\Backups", "C:\Projects\Logs") -File | Where-Object { $_.LastWriteTime -lt $cutoffDate }
+    if ($filesToArchive.Count -gt 0) {
+        $zipPath = Join-Path -Path $archiveDir -ChildPath "Archive_$(Get-Date -Format 'yyyyMMdd_HHmmss').zip"
+        Compress-Archive -Path $filesToArchive.FullName -DestinationPath $zipPath
+        Write-Host "Archived files to: $zipPath"
+        Move-Item -Path $filesToArchive.FullName -Destination $archiveDir
+        Write-Host "Moved original files to archive directory." -ErrorAction Stop
+    } else {
+        Write-Host "No files older than $retentionDays days to archive."
+    }
