@@ -1,0 +1,30 @@
+C-Drve Storage Scanner
+
+# Code scans physical storage on local machine and determines if free storage is within acceptable threshold
+# Variables Defined (Lines 7-24)
+# If/Else statement within action variable allows for task to be scheduled
+
+$Action = New-ScheduledTaskAction `
+    -Execute "PowerShell.exe" -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File C:\Projects\Scripts\StorageScanner.ps1"
+    $Threshold = 100*1GB
+    $drive = Get-PSDrive -Name C
+    $FreeSpaceBytes = $drive.Free
+    $FreeSpaceGB = [math]::Round($FreeSpaceBytes / 1GB, 2)
+        if ($FreeSpaceBytes -lt $Threshold) {
+        Write-Host "WARNING: Free space is below $Threshold GB. Current free space = $FreeSpaceGB GB"
+        } else {
+             Write-Host "Free space is sufficient = $FreeSpaceGB GB"
+    }
+$TimeStamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+$Message = "Scan completed. Free space = $FreeSpaceGB GB"
+$LogPath = "C:\Projects\Logs\StorageScanner.log"
+Add-Content -Path $LogPath -Value "$TimeStamp -[INFO] $Message"
+$Trigger = New-ScheduledTaskTrigger -Daily -At 09:00
+$Settings = New-ScheduledTaskSettingsSet `
+    -StartWhenAvailable
+Register-ScheduledTask -Force `
+    -TaskName "C-Drive Storage Scanner" `
+    -Action $Action `
+    -Trigger $Trigger `
+    -Settings $Settings `
+    -Principal (New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest)
